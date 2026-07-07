@@ -22,7 +22,7 @@ _Component to integrate with [Rocky Mountain Power][rmp]._
 
 1. Click the button above, or open HACS in Home Assistant.
 2. Go to HACS -> Integrations -> three dots menu -> Custom repositories.
-3. Add `https://github.com/AurelioB/rocky-mountain-power` as an Integration.
+3. Add `https://github.com/AurelioB/ha-rocky-mountain-power` as an Integration.
 4. Search for "Rocky Mountain Power" and install it.
 5. Restart Home Assistant.
 6. Continue to Configuration.
