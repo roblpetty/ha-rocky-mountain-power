@@ -674,9 +674,7 @@ class RockyMountainPower:
         end_date: datetime,
     ) -> float:
         """Get solar export energy for the current billing period."""
-        today = arrow.now(self.utility.TZ).date()
-        months = max(1, ((today - start_date.date()).days // 31) + 1)
-        details = self._encrypted_post(
+        details = self.utility._encrypted_post(
             "/api/energy-usage/getUsageForDateRange",
             {
                 "getUsageForDateRangeRequestBody": {
