@@ -678,7 +678,7 @@ class RockyMountainPower:
             "/api/energy-usage/getUsageForDateRange",
             {
                 "getUsageForDateRangeRequestBody": {
-                    "agreement": self._agreement_identity(),
+                    "agreement": self.utility._agreement_identity(),
                     "dateRange": {
                         "startDate": (start_date.date() - timedelta(days=1)).isoformat(),
                         "endDate": end_date.date().isoformat(),
