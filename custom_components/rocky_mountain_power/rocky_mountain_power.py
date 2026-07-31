@@ -693,7 +693,7 @@ class RockyMountainPower:
         return sum(
             float(d.get("kwhReverseUsageQuantity", 0) or 0)
             for d in details.get("getUsageForDateRangeResponseBody", {}).get("dailyUsageList", {}).get("usgHistoryLineItem", [])
-            if start <= date.fromisoformat(d["usagePeriodEndDate"]).date() <= end
+            if start <= date.fromisoformat(d["usagePeriodEndDate"]) <= end
         )
 
     def _get_account(self) -> Any:
