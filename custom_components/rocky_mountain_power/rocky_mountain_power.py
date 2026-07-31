@@ -547,6 +547,7 @@ class Forecast:
     forecasted_cost_low: float
     forecasted_cost_high: float
     energy_consumption: Optional[float]
+    energy_export: Optional[float]
 
 
 @dataclasses.dataclass
@@ -622,10 +623,15 @@ class RockyMountainPower:
             start_date = arrow.get(date.fromisoformat(forecast["startDateForAMIAcctView"]), self.utility.TZ).datetime
             end_date = arrow.get(date.fromisoformat(forecast["endDateForAMIAcctView"]), self.utility.TZ).datetime
             energy_consumption = None
+            energy_export = None
             try:
                 energy_consumption = self.get_current_bill_energy_consumption(start_date, end_date)
             except Exception:
                 _LOGGER.warning("Unable to fetch current bill energy consumption", exc_info=True)
+            try:
+                energy_export = self.get_current_bill_energy_export(start_date, end_date)
+            except Exception:
+                _LOGGER.warning("Unable to fetch current bill energy export", exc_info=True)
             forecasts.append(
                 Forecast(
                     account=Account(
@@ -640,6 +646,7 @@ class RockyMountainPower:
                     forecasted_cost_low=float(forecast.get("projectedCostLow", 0)),
                     forecasted_cost_high=float(forecast.get("projectedCostHigh", 0)),
                     energy_consumption=energy_consumption,
+                    energy_export=energy_export,
                 )
             )
         return forecasts
@@ -659,6 +666,36 @@ class RockyMountainPower:
             read.consumption
             for read in reads
             if start <= read.end_time.date() <= end
+        )
+
+    def get_current_bill_energy_export(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> float:
+        """Get solar export energy for the current billing period."""
+        today = arrow.now(self.utility.TZ).date()
+        months = max(1, ((today - start_date.date()).days // 31) + 1)
+        details = self._encrypted_post(
+            "/api/energy-usage/getUsageForDateRange",
+            {
+                "getUsageForDateRangeRequestBody": {
+                    "agreement": self._agreement_identity(),
+                    "dateRange": {
+                        "startDate": (start_date.date() - timedelta(days=1)).isoformat(),
+                        "endDate": end_date.date().isoformat(),
+                    },
+                    "graphView": "DAY",
+                    "graphWindow": "ONE_MONTH",
+                }
+            },
+        )
+        start = start_date.date()
+        end = end_date.date()
+        return sum(
+            float(d.get("kwhReverseUsageQuantity", 0) or 0)
+            for d in details.get("getUsageForDateRangeResponseBody", {}).get("dailyUsageList", {}).get("usgHistoryLineItem", [])
+            if start <= date.fromisoformat(d["usagePeriodEndDate"]).date() <= end
         )
 
     def _get_account(self) -> Any:

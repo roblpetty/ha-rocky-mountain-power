@@ -75,6 +75,15 @@ ELEC_SENSORS: tuple[RockyMountainPowerEntityDescription, ...] = (
         suggested_display_precision=2,
         value_fn=lambda data: data.energy_consumption,
     ),
+    RockyMountainPowerEntityDescription(
+        key="elec_current_bill_energy_export",
+        name="Current bill energy export",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.energy_export,
+    ),
 )
 
 
