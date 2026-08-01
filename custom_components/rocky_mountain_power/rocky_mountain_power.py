@@ -693,27 +693,41 @@ class RockyMountainPower:
         months = max(1, ((today - start_date.date()).days // 31) + 1)
         usage = self.utility.get_usage_by_day(months=months)
 
-        bill_reads = [
-            read for read in usage
+        reads_by_date = {
+            read["startTime"].date(): read
+            for read in usage
             if start_date.date() <= read["startTime"].date() <= end_date.date()
-        ]
-        bill_reads.sort(key=lambda read: read["startTime"])
+        }
 
-        missing_reads = [read for read in bill_reads if read.get("missing")]
-        if not missing_reads:
+        end = min(end_date.date(), today)
+        missing_dates: list[date] = []
+        current_date = start_date.date()
+        while current_date <= end:
+            found = reads_by_date.get(current_date)
+            if found is None or found.get("missing"):
+                missing_dates.append(current_date)
+            current_date += timedelta(days=1)
+
+        if not missing_dates:
+            return None
+
+        actual_dates = sorted(
+            day for day, read in reads_by_date.items() if not read.get("missing")
+        )
+        if not actual_dates:
             return None
 
         estimated_missing = 0.0
-        for missing_read in missing_reads:
+        for missing_date in missing_dates:
             previous_actual = [
-                read for read in bill_reads
-                if read["startTime"].date() < missing_read["startTime"].date() and not read.get("missing")
+                day for day in actual_dates if day < missing_date
             ]
-            previous_actual.sort(key=lambda read: read["startTime"], reverse=True)
-            previous_actual = previous_actual[:5]
+            previous_actual = previous_actual[-5:]
             if not previous_actual:
                 return None
-            estimated_missing += sum(read["usage"] for read in previous_actual) / len(previous_actual)
+            estimated_missing += sum(
+                reads_by_date[day]["usage"] for day in previous_actual
+            ) / len(previous_actual)
 
         return estimated_missing
 
