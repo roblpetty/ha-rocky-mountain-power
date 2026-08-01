@@ -635,6 +635,12 @@ class RockyMountainPower:
                 energy_consumption_estimated = self.get_current_bill_energy_consumption_estimated(
                     start_date, end_date
                 )
+                _LOGGER.debug(
+                    "Estimated current bill energy consumption for %s - %s: %s",
+                    start_date.date(),
+                    end_date.date(),
+                    energy_consumption_estimated,
+                )
             except Exception:
                 _LOGGER.warning(
                     "Unable to fetch estimated current bill energy consumption",
@@ -709,12 +715,22 @@ class RockyMountainPower:
             current_date += timedelta(days=1)
 
         if not missing_dates:
+            _LOGGER.debug(
+                "No missing daily usage records found between %s and %s",
+                start_date.date(),
+                end_date.date(),
+            )
             return None
 
         actual_dates = sorted(
             day for day, read in reads_by_date.items() if not read.get("missing")
         )
         if not actual_dates:
+            _LOGGER.debug(
+                "No actual daily usage records available for %s - %s",
+                start_date.date(),
+                end_date.date(),
+            )
             return None
 
         estimated_missing = 0.0
@@ -724,11 +740,22 @@ class RockyMountainPower:
             ]
             previous_actual = previous_actual[-5:]
             if not previous_actual:
+                _LOGGER.debug(
+                    "Insufficient prior actual usage data to estimate missing date %s",
+                    missing_date,
+                )
                 return None
             estimated_missing += sum(
                 reads_by_date[day]["usage"] for day in previous_actual
             ) / len(previous_actual)
 
+        _LOGGER.debug(
+            "Estimated total missing usage for %s - %s: %s from %s missing dates",
+            start_date.date(),
+            end_date.date(),
+            estimated_missing,
+            len(missing_dates),
+        )
         return estimated_missing
 
     def get_current_bill_energy_export(
