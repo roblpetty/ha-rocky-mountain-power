@@ -451,6 +451,7 @@ class RockyMountainPowerUtility:
                 "endTime": end_time - timedelta(seconds=1),
                 "usage": float(d.get("kwhUsageQuantity", 0)),
                 "amount": amount,
+                "missing": d.get("missingDataFlag", "N") != "N",
             })
         return usage
 
@@ -547,6 +548,7 @@ class Forecast:
     forecasted_cost_low: float
     forecasted_cost_high: float
     energy_consumption: Optional[float]
+    energy_consumption_estimated: Optional[float]
     energy_export: Optional[float]
 
 
@@ -628,10 +630,22 @@ class RockyMountainPower:
                 energy_consumption = self.get_current_bill_energy_consumption(start_date, end_date)
             except Exception:
                 _LOGGER.warning("Unable to fetch current bill energy consumption", exc_info=True)
+                energy_consumption = None
+            try:
+                energy_consumption_estimated = self.get_current_bill_energy_consumption_estimated(
+                    start_date, end_date
+                )
+            except Exception:
+                _LOGGER.warning(
+                    "Unable to fetch estimated current bill energy consumption",
+                    exc_info=True,
+                )
+                energy_consumption_estimated = None
             try:
                 energy_export = self.get_current_bill_energy_export(start_date, end_date)
             except Exception:
                 _LOGGER.warning("Unable to fetch current bill energy export", exc_info=True)
+                energy_export = None
             forecasts.append(
                 Forecast(
                     account=Account(
@@ -646,6 +660,7 @@ class RockyMountainPower:
                     forecasted_cost_low=float(forecast.get("projectedCostLow", 0)),
                     forecasted_cost_high=float(forecast.get("projectedCostHigh", 0)),
                     energy_consumption=energy_consumption,
+                    energy_consumption_estimated=energy_consumption_estimated,
                     energy_export=energy_export,
                 )
             )
@@ -667,6 +682,40 @@ class RockyMountainPower:
             for read in reads
             if start <= read.end_time.date() <= end
         )
+
+    def get_current_bill_energy_consumption_estimated(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> Optional[float]:
+        """Estimate energy consumption for missing dates in the current billing period."""
+        today = arrow.now(self.utility.TZ).date()
+        months = max(1, ((today - start_date.date()).days // 31) + 1)
+        usage = self.utility.get_usage_by_day(months=months)
+
+        bill_reads = [
+            read for read in usage
+            if start_date.date() <= read["startTime"].date() <= end_date.date()
+        ]
+        bill_reads.sort(key=lambda read: read["startTime"])
+
+        missing_reads = [read for read in bill_reads if read.get("missing")]
+        if not missing_reads:
+            return None
+
+        estimated_missing = 0.0
+        for missing_read in missing_reads:
+            previous_actual = [
+                read for read in bill_reads
+                if read["startTime"].date() < missing_read["startTime"].date() and not read.get("missing")
+            ]
+            previous_actual.sort(key=lambda read: read["startTime"], reverse=True)
+            previous_actual = previous_actual[:5]
+            if not previous_actual:
+                return None
+            estimated_missing += sum(read["usage"] for read in previous_actual) / len(previous_actual)
+
+        return estimated_missing
 
     def get_current_bill_energy_export(
         self,
